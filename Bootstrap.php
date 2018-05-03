@@ -38,7 +38,7 @@ class Shopware_Plugins_Backend_AvhGoogleTaxonomie_Bootstrap extends Shopware_Com
 	 *
 	 */	
 	public function getVersion(){
-	  return "1.0.0";
+	  return "1.0.1";
 	}
 	
 	/**
@@ -48,7 +48,7 @@ class Shopware_Plugins_Backend_AvhGoogleTaxonomie_Bootstrap extends Shopware_Com
 	 */  
 	public function install()
 	{
-	if (!$this->assertVersionGreaterThen("4.3.1")){
+	if (!$this->assertMinimumVersion("4.3.1")){
      		throw new Enlight_Exception("This Plugin needs min shopware 4.3.1");
 		}
     
@@ -127,7 +127,7 @@ class Shopware_Plugins_Backend_AvhGoogleTaxonomie_Bootstrap extends Shopware_Com
      public function postUpdateDetail(Enlight_Event_EventArgs $arguments) {
          $modelManager = $arguments->get('entityManager');
          $model = $arguments->get('entity');
-         $articleID = $model->getId();   
+         $articleID = $model->getId();
          $this->copyone($articleID);
 
     }
@@ -139,35 +139,36 @@ class Shopware_Plugins_Backend_AvhGoogleTaxonomie_Bootstrap extends Shopware_Com
      */        
         public function copy()
         {
+            $ret2[] = array();
             $katfeld = "attribute" . $this->Config()->KategorieFreitextFeld;
             $artfeld = "attr" . $this->Config()->ArtikelFreitextfeld;
             $getsql = "SELECT a.articleID, a.categoryID, b.$katfeld
                         from s_articles_categories AS a
-                        JOIN  s_categories_attributes AS b ON a.categoryID = b.categoryID                        
-                      ";                      
-            $getsql .= "WHERE LENGTH( b.$katfeld ) >1"; //Schliesst leere Einträge vom Update aus!                      
+                        JOIN  s_categories_attributes AS b ON a.categoryID = b.categoryID ";
+            $getsql .= "WHERE LENGTH( b.$katfeld ) >1"; //Schliesst leere Einträge vom Update aus!
 
-            $res = Shopware()->Db()->fetchAll($getsql);
-        
-        foreach ($res as $value) {
-             if(strlen($value[$katfeld])>1)
-            {
-                $pid = $value['articleID'];
-                $taxo = $value[$katfeld];
-                $sql = "UPDATE s_articles_attributes SET $artfeld = '$taxo' WHERE articleID = $pid";
-                try {
-                /* SCHEIB TAXANOMIE*/ 
-                Shopware()->Db()->exec($sql);
-                $ret[] = array('ArticleID' => $pid, 'Artikel Freitextfeld' => $artfeld, 'Taxonomie' => $taxo);
+            $res1 = Shopware()->Db()->fetchAll($getsql);
+
+            foreach ($res1 as $value1) {
+                if(strlen($value1[$katfeld])>1)
+                {
+                    $articleID = $value1['articleID'];
+                    $taxo = $value1[$katfeld];
+                    $q1 = "SELECT id FROM `s_articles_details` WHERE articleID = $articleID";
+
+                    $ret1 = Shopware()->Db()->fetchAll($q1);
+                    foreach ($ret1 as $value2) {
+                        $articledetailsID = $value2['id'];
+                        $q2 = "UPDATE s_articles_attributes SET $artfeld = '$taxo' WHERE articledetailsID = $articledetailsID";
+                        /* SCHEIB TAXANOMIE */
+                        Shopware()->Db()->exec($q2);
+
+                        $ret2[] = array('ArticleID' => "articleID: " . $articleID, 'Artikel Freitextfeld' => $artfeld, 'Taxonomie' => $taxo);
+                    }
                 }
-                catch (Exception $e) {  $UPDATE = false; }                
-                } 
-             
-
             }
-            
-            return true;
-
+            $this->avh_debug($ret2);
+        return true;
         }
 
         
@@ -178,6 +179,7 @@ class Shopware_Plugins_Backend_AvhGoogleTaxonomie_Bootstrap extends Shopware_Com
      */        
         public function copyone($articleID)
         {
+            $ret[] = array();
             $katfeld = "attribute" . $this->Config()->KategorieFreitextFeld;
             $artfeld = "attr" . $this->Config()->ArtikelFreitextfeld;
             $getsql = "SELECT a.articleID, a.categoryID, b.$katfeld
@@ -188,22 +190,26 @@ class Shopware_Plugins_Backend_AvhGoogleTaxonomie_Bootstrap extends Shopware_Com
             $getsql .= "AND LENGTH( b.$katfeld ) >1"; //Schliesst leere Einträge vom Update aus!                      
 
             $res = Shopware()->Db()->fetchRow($getsql);
-        
+
             if(strlen($res['attribute1'])>1)
-            {
-                $taxo = $res['attribute1'];
-         
-                $sql = "UPDATE s_articles_attributes SET $artfeld = '$taxo' WHERE articleID = $articleID";
-                try {
-                /* SCHEIB TAXANOMIE*/ 
-                Shopware()->Db()->exec($sql);
-                //TODO -> VARIANTEN DIE TAXONIMIE SCHREIBEN
-                $ret[] = array('ArticleID' => $pid, 'Artikel Freitextfeld' => $artfeld, 'Taxonomie' => $taxo);
-                }
-                catch (Exception $e) {  $UPDATE = false; }                
-            } 
-             
-            return $ret;
+                 {
+                     $taxo = $res['attribute1'];
+                     $q1 = "SELECT id FROM `s_articles_details` WHERE articleID = $articleID";
+                     $ret1 = Shopware()->Db()->fetchAll($q1);
+                     foreach ($ret1 as $value2) {
+                         $articledetailsID = $value2['id'];
+                         $q2 = "UPDATE s_articles_attributes SET $artfeld = '$taxo' WHERE articledetailsID = $articledetailsID";
+                         try {
+                             $res2 = Shopware()->Db()->exec($q2);
+                         } catch (Exception $e) {
+                             $err = $e->getMessage();
+                         }
+                         $ret[] = array('ArticleID' => "articleID: " . $articleID, 'Artikel Freitextfeld' => $artfeld, 'Taxonomie' => $taxo);
+                     }
+                 }
+
+            $this->avh_debug($ret);
+            return true;
 
         }
         
@@ -214,17 +220,22 @@ class Shopware_Plugins_Backend_AvhGoogleTaxonomie_Bootstrap extends Shopware_Com
      */ 
     public function avh_debug ($log,$newfile)
     {
-      ob_start();
-      print_r($log);
-      if($newfile==1) //Leert die Log Datei vor dem Schreiben
-      {
-        file_put_contents('GoogleTaxonomie.log', ob_get_contents()); 
-      }
-      else
-      {
-        file_put_contents('GoogleTaxonomie.log', file_get_contents('GoogleTaxonomie.log') . "\n" . ob_get_contents());
-      }
-      ob_end_clean();
+        if($this->Config()->showres == false)
+        {
+            return false;
+        } else {
+            ob_start();
+            print_r($log);
+            if($newfile==1) //Leert die Log Datei vor dem Schreiben
+            {
+                file_put_contents('GoogleTaxonomie.log', ob_get_contents());
+            }
+            else
+            {
+                file_put_contents('GoogleTaxonomie.log', file_get_contents('GoogleTaxonomie.log') . "\n" . ob_get_contents());
+            }
+            ob_end_clean();
+        }
     }
              
 }
