@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<plugin xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://raw.githubusercontent.com/shopware/shopware/5.2/engine/Shopware/Components/Plugin/schema/plugin.xsd">
+    <label lang="de">Google Taxonomie Helfer</label>
+    <label lang="en">Google Taxonomie Helfer</label>
+
+    <version>2.0.0</version>
+    <license>properitar</license>
+    <link>http://www.vh-networks.de</link>
+    <author>VH-NETWORKS</author>
+    <compatibility minVersion="5.3.0"/>
+
+    <changelog version="1.0.0">
+        <changes lang="de">Relaunch;</changes>
+        <changes lang="en">Relaunch;</changes>
+    </changelog>
+
+</plugin>
