@@ -380,7 +380,7 @@ class AvhGoogleTaxonomie extends Plugin
                     //ItemCondition //todo: prüfen ob die ItemeCondition bei Kategerorien im Template und im Feed herauskommt
                     $product['avh_google_itemconditon'] = str_replace(array('RefurbishedCondition', 'UsedCondition', 'NewCondition'), array('generalüberholt', 'gebraucht', 'neu'), $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_itemconditon'));
                     //avh_google_adult
-                    $product['avh_google_adult'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_itemconditon');
+                    $product['avh_google_adult'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_adult');
                     //TODO 0 darf nicht ausgegeben werden bei avh_google_multipack
                     if($this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_multipack')>0)
                     {
