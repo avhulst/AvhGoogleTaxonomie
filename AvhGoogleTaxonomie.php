@@ -8,6 +8,7 @@ use Shopware\Components\Plugin\Context\InstallContext;
 use Shopware\Components\Plugin\Context\UninstallContext;
 use AvhGoogleTaxonomie\Bootstrap\Database;
 use Doctrine\ORM\Tools\SchemaTool;
+use Shopware\Components\Plugin\Context\UpdateContext;
 
 class AvhGoogleTaxonomie extends Plugin
 {
@@ -270,11 +271,34 @@ class AvhGoogleTaxonomie extends Plugin
         ]);
         $builder->from(\AvhGoogleTaxonomie\Models\AvhTaxonomie::class, 'taxonomie');
 
+        //Ausführen wenn Model befüllt
+        if(count($builder->getQuery()->getArrayResult())>1) {
+            /*$database->uninstall();
+            $database->install();
+
+            $em = $this->container->get('models');
+            $schemaTool = new SchemaTool($em);
+            $schemaTool->updateSchema(
+                [$em->getClassMetadata(\AvhGoogleTaxonomie\Models\AvhTaxonomie::class)],
+                true
+            );
+            //Befüllt das Model mit den Google Taxonomien
+            */
+            $this->getTaxonomieFromFile(true);
+        }
+
         //Ausführen wenn Model leer
         if(count($builder->getQuery()->getArrayResult())<1) {
             //Befüllt das Model mit den Google Taxonomien
             $this->getTaxonomieFromFile();
         }
+    }
+
+    public function update(UpdateContext $context)
+    {
+
+        $this->getTaxonomieFromFile(true);
+
     }
 
     /***
@@ -284,7 +308,6 @@ class AvhGoogleTaxonomie extends Plugin
     public function uninstall(UninstallContext $context)
     {
         $service = $this->container->get('shopware_attribute.crud_service');
-
 
         $service->delete('s_export_attributes', 'Avh_Merchant_Export');
         $service->delete('s_articles_attributes', 'avh_google_title');
@@ -362,46 +385,57 @@ class AvhGoogleTaxonomie extends Plugin
             foreach ($products as &$product) {
                 $i++;
                 $taxoid = $this->getArticleFirst($this->getTaxoFromArticle($product['articleID']), $this->getTaxoFromCategory($product['articleID']));
-                if ($taxoid) {
+                try {
+                    if ($taxoid) {
 
-                    //Name & Description ersetzten wenn vorhanden
+                        //Name & Description ersetzten wenn vorhanden
 
-                    if(strlen( $this->getAttributeFromArticle($product['articleID'], 'avh_google_title'))>3) {
-                        $product['name'] = $this->getAttributeFromArticle($product['articleID'], 'avh_google_title');
-                    }
-                    if(strlen( $this->getAttributeFromArticle($product['articleID'], 'avh_google_description'))>3) {
-                        $product['description_long'] = $this->getAttributeFromArticle($product['articleID'], 'avh_google_description');
-                    }
+                        if (strlen($this->getAttributeFromArticle($product['articleID'], 'avh_google_title')) > 3) {
+                            $product['name'] = $this->getAttributeFromArticle($product['articleID'], 'avh_google_title');
+                        }
+                        if (strlen($this->getAttributeFromArticle($product['articleID'], 'avh_google_description')) > 3) {
+                            $product['description_long'] = $this->getAttributeFromArticle($product['articleID'], 'avh_google_description');
+                        }
 
-                    //Deutschland - Gibt die lokalisierte Google Taxonomie aus
-                    $product['avh_google_taxonomie'] = $em->find($taxoid)->getName();
-                    //International - Gibt die Google Taxonomie ID aus
-                    $product['avh_google_taxonomieid'] = $em->find($taxoid)->getGoogleid();
-                    //ItemCondition //todo: prüfen ob die ItemeCondition bei Kategerorien im Template und im Feed herauskommt
-                    $product['avh_google_itemconditon'] = str_replace(array('RefurbishedCondition', 'UsedCondition', 'NewCondition'), array('generalüberholt', 'gebraucht', 'neu'), $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_itemconditon'));
-                    //avh_google_adult
-                    $product['avh_google_adult'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_adult');
-                    //TODO 0 darf nicht ausgegeben werden bei avh_google_multipack
-                    if($this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_multipack')>0)
-                    {
-                        $product['avh_google_multipack'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_multipack');
-                    } else {
-                        $product['avh_google_multipack'] = '';
+                        //Deutschland - Gibt die lokalisierte Google Taxonomie aus
+                        $taxo_object = $em->find($taxoid);
+                        if($taxo_object != null) {
+                            $product['avh_google_taxonomie'] = $taxo_object->getName();
+
+                            //International - Gibt die Google Taxonomie ID aus
+                            $product['avh_google_taxonomieid'] = $taxo_object->getGoogleid();
+                            #Shopware()->PluginLogger()->info("AvhGoogleTaxonimie: Taxoid OKAY bei Artikel " . $product['ordernumber']);
+                        } else {
+                            // @todo woher kommt null wert?.
+                            Shopware()->PluginLogger()->warning("AvhGoogleTaxonimie: Taxoid NULL bei Artikel " . $product['ordernumber']);
+                        }
+                        //ItemCondition //todo: prüfen ob die ItemeCondition bei Kategerorien im Template und im Feed herauskommt
+                        $product['avh_google_itemconditon'] = str_replace(array('RefurbishedCondition', 'UsedCondition', 'NewCondition'), array('generalüberholt', 'gebraucht', 'neu'), $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_itemconditon'));
+                        //avh_google_adult
+                        $product['avh_google_adult'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_adult');
+                        //TODO 0 darf nicht ausgegeben werden bei avh_google_multipack
+                        if ($this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_multipack') > 0) {
+                            $product['avh_google_multipack'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_multipack');
+                        } else {
+                            $product['avh_google_multipack'] = '';
+                        }
+                        $product['avh_google_efficiency_class'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_energy_efficiency_class');
+                        $product['avh_google_age_group'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_age_group');
+                        $product['avh_google_color'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_color');
+                        $product['avh_google_gender'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_gender');
+                        $product['avh_google_material'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_material');
+                        $product['avh_google_pattern'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_pattern');
+                        $product['avh_google_size'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_size');
+                        $product['avh_google_size_type'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_size_type');
+                        $product['avh_google_size_system'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_size_system');
+                        $product['avh_google_custom_label0'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_0');
+                        $product['avh_google_custom_label1'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_1');
+                        $product['avh_google_custom_label2'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_2');
+                        $product['avh_google_custom_label3'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_3');
+                        $product['avh_google_custom_label4'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_4');
                     }
-                    $product['avh_google_efficiency_class'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_energy_efficiency_class');
-                    $product['avh_google_age_group'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_age_group');
-                    $product['avh_google_color'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_color');
-                    $product['avh_google_gender'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_gender');
-                    $product['avh_google_material'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_material');
-                    $product['avh_google_pattern'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_pattern');
-                    $product['avh_google_size'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_size');
-                    $product['avh_google_size_type'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_size_type');
-                    $product['avh_google_size_system'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_size_system');
-                    $product['avh_google_custom_label0'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_0');
-                    $product['avh_google_custom_label1'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_1');
-                    $product['avh_google_custom_label2'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_2');
-                    $product['avh_google_custom_label3'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_3');
-                    $product['avh_google_custom_label4'] = $this->getAttributeFromArticleAndCategory($product['articleID'], 'avh_google_custom_label_4');
+                } catch (\Exception $e) {
+                    $this->avh_debug($e->getMessage());
                 }
             }
         }
@@ -460,7 +494,7 @@ class AvhGoogleTaxonomie extends Plugin
 
         if(!empty($articleID)) {
             $q1 = "SELECT $attribute FROM s_articles_attributes WHERE articleID = $articleID";
-            $this->avh_debug($q1,1);
+            #$this->avh_debug($q1,1);
             $articleAttribute = Shopware()->Db()->fetchOne($q1);
 
             $q2 = "SELECT ca.$attribute from s_articles_categories AS c
@@ -518,7 +552,7 @@ class AvhGoogleTaxonomie extends Plugin
      *
      * Import Google Taxonomies in das Model
      */
-    public function getTaxonomieFromFile()
+    public function getTaxonomieFromFile($update=false)
     {
         $em = Shopware()->Models();
 
@@ -530,11 +564,24 @@ class AvhGoogleTaxonomie extends Plugin
             #$taxo[] = ['key' => $erg[$i][0], 'value' => $erg[$i][1]];
             if($erg[$i][1])
             {
-                $unit = new \AvhGoogleTaxonomie\Models\AvhTaxonomie;
-                $unit->setName($erg[$i][1]);
-                $unit->setGoogleid($erg[$i][0]);
-                $em->persist($unit);
-                $em->flush($unit);
+                if($update==false) {
+                    $unit = new \AvhGoogleTaxonomie\Models\AvhTaxonomie;
+                    $unit->setName($erg[$i][1]);
+                    $unit->setGoogleid($erg[$i][0]);
+                    $em->persist($unit);
+                    $em->flush($unit);
+                } else {
+                    $em = $this->container->get('models');
+                    $builder = $em->createQueryBuilder();
+
+                    $q = $builder
+                        ->update(\AvhGoogleTaxonomie\Models\AvhTaxonomie::class,taxonomie)
+                        ->set('taxonomie.name',$builder->expr()->literal($erg[$i][1]))
+                        ->where('taxonomie.googleid = ?1')
+                        ->setParameter(1, $erg[$i][0]);
+                    $q->getQuery()->execute();
+
+                }
             }
         }
         fclose($file);
