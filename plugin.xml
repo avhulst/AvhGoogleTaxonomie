@@ -4,9 +4,9 @@
     <label lang="en">Google Taxonomie Helfer</label>
 
     <version>2.0.1</version>
-    <license>properitar</license>
-    <link>http://www.vh-networks.de</link>
-    <author>VH-NETWORKS</author>
+    <license>MIT</license>
+    <link>https://www.vanhulst.de</link>
+    <author>Andreas van Hulst</author>
     <compatibility minVersion="5.3.0"/>
 
     <changelog version="1.0.0">

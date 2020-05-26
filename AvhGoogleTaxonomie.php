@@ -388,7 +388,7 @@ class AvhGoogleTaxonomie extends Plugin
                 try {
                     if ($taxoid) {
 
-                        //Name & Description ersetzten wenn vorhanden
+                        //Name & Description ersetzen wenn vorhanden
 
                         if (strlen($this->getAttributeFromArticle($product['articleID'], 'avh_google_title')) > 3) {
                             $product['name'] = $this->getAttributeFromArticle($product['articleID'], 'avh_google_title');
@@ -511,6 +511,11 @@ class AvhGoogleTaxonomie extends Plugin
         }
     }
 
+    /***
+     * @param $articleID
+     * @param $attribute
+     * @return false|string|null
+     */
     public function getAttributeFromArticle($articleID,$attribute)
     {
         if(!empty($articleID)) {
@@ -538,13 +543,6 @@ class AvhGoogleTaxonomie extends Plugin
 
     }
 
-    #public function extendExtJS(\Enlight_Event_EventArgs $arguments)
-    #{
-    #    /** @var \Enlight_View_Default $view */
-    #    $view = $arguments->getSubject()->View();
-    #    $view->addTemplateDir($this->getPath() . '/Resources/views/');
-    #    $view->extendsTemplate('backend/swag_attribute/Shopware.attribute.Form.js');
-    #}
 
     /***
      * @return bool
@@ -600,7 +598,7 @@ class AvhGoogleTaxonomie extends Plugin
         $filename = __NAMESPACE__ . ".log";
         ob_start();
         print_r($log);
-        if ($newfile == 1) //Leert die Log Datei vor dem Schreiben
+        if ($newfile == 1)
         {
             file_put_contents($filename, ob_get_contents());
         } else {
